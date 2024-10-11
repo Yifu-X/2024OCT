@@ -165,8 +165,18 @@ class Ui_MainWindow(object):
         self.project_folder = self.select_directory()
         self.original_folder = os.path.join(self.project_folder, os.path.basename(self.project_folder) + "_original")
         self.interpolation_folder = os.path.join(self.project_folder,os.path.basename(self.project_folder) + "_interpolation")
-        if os.path.exists(os.path.join(self.project_folder, os.path.basename(self.project_folder) + ".vtk")):   # 检测到已有模型，直接建模
-            self.modeling()
+        if os.path.exists(self.original_folder):  # 检测到已导入图片序列，提示
+            print("检测到已导入图片序列")
+            if os.path.exists(self.interpolation_folder):  # 检测到已有插值结果，提示
+                print("检测到已完成插值")
+                if os.path.exists(os.path.join(self.project_folder, os.path.basename(self.project_folder) + ".vtk")):   # 检测到已有模型，直接建模
+                    self.modeling()
+                else:
+                    print("当前进度：未运行建模")
+            else:
+                print("当前进度：未运行插值算法")
+        else:
+            print("当前进度：未导入图片序列")
         pass
 
     # 按键，导入图片序列
