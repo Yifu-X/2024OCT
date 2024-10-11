@@ -1,5 +1,6 @@
 '''
 ***该版本被GUI直接调用，谨慎修改***
+无后缀：git同步版本
 v2: 该版本可以被GUI直接调用，传回render；同时加入指针功能
 v1:分离了建模与渲染过程，更适配GUI操作；
 '''
@@ -21,12 +22,9 @@ from vtkmodules.vtkRenderingCore import (
     vtkPolyDataMapper,
     vtkProperty,
     vtkActor,
-    vtkRenderer,
-    vtkRenderWindow,
-    vtkRenderWindowInteractor
+    vtkRenderer
 )
 from vtkmodules.vtkCommonColor import vtkNamedColors    # 颜色
-from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
 
 class Modeling:
     def __init__(self, project_folder: str, width: int, height: int, spacing=[4, 4, 7]):

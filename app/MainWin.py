@@ -14,6 +14,8 @@ import os
 import shutil
 from tqdm import tqdm # 终端进度条
 from functools import partial
+from io import StringIO
+
 
 class Ui_MainWindow(object):
 
@@ -21,6 +23,7 @@ class Ui_MainWindow(object):
         self.project_folder = None    # 工程文件夹地址
         self.original_folder = None     # 原始图片序列文件夹
         self.interpolation_folder = None    # 插值图片序列文件夹
+
 
 
     def setupUi(self, MainWindow):
@@ -162,13 +165,15 @@ class Ui_MainWindow(object):
         self.project_folder = self.select_directory()
         self.original_folder = os.path.join(self.project_folder, os.path.basename(self.project_folder) + "_original")
         self.interpolation_folder = os.path.join(self.project_folder,os.path.basename(self.project_folder) + "_interpolation")
+        if os.path.exists(os.path.join(self.project_folder, os.path.basename(self.project_folder) + ".vtk")):   # 检测到已有模型，直接建模
+            self.modeling()
         pass
 
     # 按键，导入图片序列
     def import_jpg(self):
         # 确保保存图片的文件夹存在
         self.original_folder = os.path.join(self.project_folder,os.path.basename(self.project_folder) + "_original")
-        os.makedirs(self.original_folder, exist_ok=True)
+        os.makedirs(self.original_folder, exist_ok=True)    # 没有就创建
         print(self.original_folder)
         source_folder = self.select_directory()
         self.copy_jpg_files(source_folder, self.original_folder)
@@ -178,7 +183,7 @@ class Ui_MainWindow(object):
     def interpolation(self):
         # 确保输出文件夹存在
         self.interpolation_folder = os.path.join(self.project_folder, os.path.basename(self.project_folder) + "_interpolation")
-        os.makedirs(self.interpolation_folder, exist_ok=True)
+        os.makedirs(self.interpolation_folder, exist_ok=True)   # 没有就创建
         print(self.interpolation_folder)
         interpolator.process(self.original_folder, self.interpolation_folder)  # 输入文件夹。在源文件夹内新建xxx_interpolation文件夹用于输出。插值数默认3
 
