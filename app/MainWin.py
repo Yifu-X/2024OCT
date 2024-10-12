@@ -37,7 +37,6 @@ class Ui_MainWindow(object):
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.centralwidget)
         self.horizontalLayout.setObjectName("horizontalLayout")
 
-
         # 左侧的控件
         self.left_widget = QtWidgets.QWidget(parent=self.centralwidget)
         self.left_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
@@ -170,6 +169,7 @@ class Ui_MainWindow(object):
             if os.path.exists(self.interpolation_folder):  # 检测到已有插值结果，提示
                 print("检测到已完成插值")
                 if os.path.exists(os.path.join(self.project_folder, os.path.basename(self.project_folder) + ".vtk")):   # 检测到已有模型，直接建模
+                    print("检测到已有模型")
                     self.modeling()
                 else:
                     print("当前进度：未运行建模")
@@ -191,12 +191,15 @@ class Ui_MainWindow(object):
 
     # 按键调用插值算法
     def interpolation(self):
-        # 确保输出文件夹存在
-        self.interpolation_folder = os.path.join(self.project_folder, os.path.basename(self.project_folder) + "_interpolation")
-        os.makedirs(self.interpolation_folder, exist_ok=True)   # 没有就创建
-        print(self.interpolation_folder)
-        interpolator.process(self.original_folder, self.interpolation_folder)  # 输入文件夹。在源文件夹内新建xxx_interpolation文件夹用于输出。插值数默认3
-
+        # 保证已导入图片序列
+        if os.path.exists(self.original_folder):
+            # 确保输出文件夹存在
+            self.interpolation_folder = os.path.join(self.project_folder, os.path.basename(self.project_folder) + "_interpolation")
+            os.makedirs(self.interpolation_folder, exist_ok=True)   # 没有就创建
+            print(self.interpolation_folder)
+            interpolator.process(self.original_folder, self.interpolation_folder)  # 输入文件夹。在源文件夹内新建xxx_interpolation文件夹用于输出。插值数默认3
+        else:
+            print("未检测到图片序列，插值前请先导入图片序列。")
     # 按键调用建模
     def modeling(self):
         # 进行建模和渲染

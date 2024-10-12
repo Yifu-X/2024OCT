@@ -38,7 +38,6 @@ def compute_distance_map(matrix):
 
     return distance_map
 
-
 # 将距离图转换为矩阵
 def convert_distance_map_to_matrix(distance_map):
     # 将负数变为0，其他的变为1
@@ -46,13 +45,11 @@ def convert_distance_map_to_matrix(distance_map):
     matrix = binary_map * 255
     return matrix
 
-
-# 将矩阵保存为png
+# 将矩阵保存为jpg
 def save_matrix_as_jpg(matrix, folder_path, number):
     img = Image.fromarray(matrix.astype(np.uint8))  # 将矩阵转换为PIL图像对象
     file_path = os.path.join(folder_path, str(number).zfill(6) + '.jpg')  # 构造完整的文件路径,自动补0
     img.save(file_path)  # 保存图像为PNG文件
-
 
 def process(input_folder:str, output_folder:str, num_interpolations=3):
     start_tim = time.time()
