@@ -34,7 +34,6 @@ import os
 import shutil
 from tqdm import tqdm # 终端进度条
 from functools import partial
-from io import StringIO
 
 
 class Ui_MainWindow(object):
@@ -43,6 +42,7 @@ class Ui_MainWindow(object):
         self.project_folder = None    # 工程文件夹地址
         self.original_folder = None     # 原始图片序列文件夹
         self.interpolation_folder = None    # 插值图片序列文件夹
+        self.phtonum = None # 记录原始图片数
 
     def set_light_theme(self, MainWindow):
         # 定义一个亮色调色板
@@ -118,10 +118,16 @@ class Ui_MainWindow(object):
         progress = QProgressBar()
         progress.setMaximum(100)
         progress.setValue(50)  # 设置进度条为50%
-        # 状态栏-工程名
         self.statusbar.addPermanentWidget(progress)
+        # 状态栏-工程名
         self.status_projectname = QLabel("Project: None")
         self.statusbar.addWidget(self.status_projectname)  # 添加到状态栏的左侧
+        # 状态栏-间隔
+        self.status_spacer = QLabel("   ")
+        self.statusbar.addWidget(self.status_spacer)  # 添加到状态栏的左侧
+        # 状态栏-图片数
+        self.status_photonum = QLabel("Photo: None")
+        self.statusbar.addWidget(self.status_photonum)  # 添加到状态栏的左侧
 
         self.centralwidget = QWidget(parent=MainWindow)
         self.centralwidget.setObjectName("centralwidget")
@@ -227,8 +233,10 @@ class Ui_MainWindow(object):
         self.project_folder = self.select_directory()
         self.original_folder = os.path.join(self.project_folder, os.path.basename(self.project_folder) + "_original")
         self.interpolation_folder = os.path.join(self.project_folder,os.path.basename(self.project_folder) + "_interpolation")
-        self.status_projectname.setText(f"Project:{os.path.basename(self.project_folder)}") # 工程名显示在左下角状态栏
+        self.status_projectname.setText(f"Project: {os.path.basename(self.project_folder)}") # 工程名显示在左下角状态栏
         if os.path.exists(self.original_folder):  # 检测到已导入图片序列，提示
+            self.phtonum = len([f for f in os.listdir(self.original_folder) if f.endswith('.jpg') and os.path.isfile(os.path.join(self.original_folder, f))])
+            self.status_photonum.setText(f"Photo: {self.phtonum}")
             print("检测到已导入图片序列")
             if os.path.exists(self.interpolation_folder):  # 检测到已有插值结果，提示
                 print("检测到已完成插值")
@@ -254,6 +262,8 @@ class Ui_MainWindow(object):
             print(self.original_folder)
             source_folder = self.select_directory()
             self.copy_jpg_files(source_folder, self.original_folder)
+            self.phtonum = len([f for f in os.listdir(self.original_folder) if f.endswith('.jpg') and os.path.isfile(os.path.join(self.original_folder, f))])
+            self.status_photonum.setText(f"Photo: {self.phtonum}")
         pass
 
     # 按键调用插值算法
