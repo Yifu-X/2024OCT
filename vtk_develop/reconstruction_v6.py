@@ -27,6 +27,12 @@ from vtk import (
     vtkPlane,
     vtkClipPolyData,
     vtkExtractVOI,
+    vtkImageThreshold,
+    vtkGeometryFilter,
+    vtkImageDataGeometryFilter,
+    vtkImageSobel2D,
+    vtkContourFilter,
+    vtkMarchingSquares,
 )
 from vtkmodules.vtkCommonColor import vtkNamedColors  # 颜色
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
@@ -120,6 +126,46 @@ class Reconstruction:
         # 读取jpg序列
         jpgmodel = self.jpgReader(0, 500)
 
+        # 读取需要开孔的位置
+        jpg_path = os.path.join(self.jpg_folder,"000316.jpg")
+        jpg_reader = vtkJPEGReader()
+        jpg_reader.SetFileName(jpg_path)
+        jpg_reader.Update()
+        print("开孔成功读取!")
+
+        # 阈值处理，提取白色区域
+        threshold = vtkImageThreshold()
+        threshold.SetInputData(jpg_reader.GetOutput())
+        threshold.ThresholdByUpper(200)  # 提取白色区域（值为255）
+        threshold.SetInValue(255)  # 白色区域保留
+        threshold.SetOutValue(0)  # 其他区域设为0
+        threshold.Update()
+
+        # 提取白色区域
+        marching_cubes = vtkMarchingSquares()  # 二维图片可以使用 MarchingSquares
+        marching_cubes.SetInputData(threshold.GetOutput())
+        marching_cubes.SetValue(0, 255)  # 提取等值为255的白色区域
+        marching_cubes.Update()
+
+        # 高斯平滑
+        gauss = vtkImageGaussianSmooth()
+        gauss.SetInputData(jpgmodel)
+        gauss.SetStandardDeviations(1, 1, 1)  # 标准差
+        gauss.SetRadiusFactors(1, 1, 1)  # 半径
+        gauss.Update()
+        gauss.GetOutput().SetSpacing(self.spacing)
+
+        print('gauss completed')
+
+        # 创建 vtkFlyingEdges3D 对象
+        flying_edges_1 = vtkFlyingEdges3D()
+        flying_edges_1.SetInputConnection(gauss.GetOutputPort())
+        flying_edges_1.SetValue(0, 128)  # 设置边缘提取的阈值
+        flying_edges_1.Update()
+        '''
+        # 读取jpg序列
+        jpgmodel = self.jpgReader(0, 500)
+
         # 高斯平滑
         gauss = vtkImageGaussianSmooth()
         gauss.SetInputData(jpgmodel)
@@ -160,6 +206,8 @@ class Reconstruction:
         append_filter.AddInputData(flying_edges_1.GetOutput())
         append_filter.AddInputData(flying_edges_2.GetOutput())
         append_filter.Update()
+
+        '''
 
         '''
         # 创建 vtkFlyingEdges3D 对象
@@ -216,7 +264,7 @@ class Reconstruction:
 
         # 平滑
         smoothFilter = vtkWindowedSincPolyDataFilter()
-        smoothFilter.SetInputConnection(append_filter.GetOutputPort())
+        smoothFilter.SetInputConnection(flying_edges_1.GetOutputPort())
         smoothFilter.SetNumberOfIterations(150)
         smoothFilter.SetPassBand(0.1)
         smoothFilter.BoundarySmoothingOn()
@@ -242,7 +290,7 @@ class Reconstruction:
         '''
 
         mapper = vtkPolyDataMapper()
-        mapper.SetInputConnection(smoothFilter.GetOutputPort())
+        mapper.SetInputConnection(marching_cubes.GetOutputPort())
         mapper.ScalarVisibilityOn()
 
         actor = vtkActor()
