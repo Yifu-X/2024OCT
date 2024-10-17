@@ -24,6 +24,9 @@ from vtk import (
     vtkAppendPolyData,
     vtkTransform,
     vtkTransformPolyDataFilter,
+    vtkPlane,
+    vtkClipPolyData,
+    vtkExtractVOI,
 )
 from vtkmodules.vtkCommonColor import vtkNamedColors  # 颜色
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
@@ -115,18 +118,70 @@ class Reconstruction:
         start_3d = time.time()
 
         # 读取jpg序列
-        jpgmodel_1 = self.jpgReader(0,315)
-        jpgmodel_2 = self.jpgReader(316, 500)
-
+        jpgmodel = self.jpgReader(0, 500)
 
         # 高斯平滑
-        gauss_1 = vtkImageGaussianSmooth()
-        gauss_1.SetInputData(jpgmodel_1)
-        gauss_1.SetStandardDeviations(1, 1, 1)  # 标准差
-        gauss_1.SetRadiusFactors(1, 1, 1)  # 半径
-        gauss_1.Update()
-        gauss_1.GetOutput().SetSpacing(self.spacing)    # 设置空间间隔
+        gauss = vtkImageGaussianSmooth()
+        gauss.SetInputData(jpgmodel)
+        gauss.SetStandardDeviations(1, 1, 1)  # 标准差
+        gauss.SetRadiusFactors(1, 1, 1)  # 半径
+        gauss.Update()
+        print('gauss completed')
 
+        # 分割
+        extractor_1 = vtkExtractVOI()
+        extractor_1.SetInputData(gauss.GetOutput())  # 假设你有一个 vtkImageData 对象
+        extractor_1.SetVOI(0, self.width - 1, 0, self.height - 1, 0, 315)  # 定义你感兴趣的区域
+        extractor_1.Update()
+        extractor_1.GetOutput().SetSpacing(self.spacing)  # 设置空间间隔
+        print("切割完毕")
+
+        extractor_2 = vtkExtractVOI()
+        extractor_2.SetInputData(gauss.GetOutput())  # 假设你有一个 vtkImageData 对象
+        extractor_2.SetVOI(0, self.width - 1, 0, self.height - 1, 316, 500)  # 定义你感兴趣的区域
+        extractor_2.Update()
+        extractor_2.GetOutput().SetSpacing(self.spacing)  # 设置空间间隔
+        print("切割完毕")
+
+        # 创建 vtkFlyingEdges3D 对象
+        flying_edges_1 = vtkFlyingEdges3D()
+        flying_edges_1.SetInputConnection(extractor_1.GetOutputPort())
+        flying_edges_1.SetValue(0, 128)  # 设置边缘提取的阈值
+        flying_edges_1.Update()
+
+        flying_edges_2 = vtkFlyingEdges3D()
+        flying_edges_2.SetInputConnection(extractor_2.GetOutputPort())
+        flying_edges_2.SetValue(0, 128)  # 设置边缘提取的阈值
+        flying_edges_2.Update()
+        print('flying_edges completed')
+
+        # 拼接
+        append_filter = vtkAppendPolyData()
+        append_filter.AddInputData(flying_edges_1.GetOutput())
+        append_filter.AddInputData(flying_edges_2.GetOutput())
+        append_filter.Update()
+
+        '''
+        # 创建 vtkFlyingEdges3D 对象
+        flying_edges_1 = vtkFlyingEdges3D()
+        flying_edges_1.SetInputConnection(gauss.GetOutputPort())
+        flying_edges_1.SetValue(0, 128)  # 设置边缘提取的阈值
+        flying_edges_1.Update()
+
+        # 剪切面
+        plane = vtkPlane()
+        plane.SetOrigin(0, 0, 315*self.spacing[2])  # 平面的原点
+        plane.SetNormal(0, 0, 1)  # 平面的法向量，决定保留的方向
+
+        # 创建 vtkClipPolyData
+        clipper = vtkClipPolyData()
+        clipper.SetInputConnection(flying_edges_1.GetOutputPort())
+        clipper.SetClipFunction(plane)  # 设置剪切平面
+        # clipper.InsideOutOn()  # 如果启用此行，将保留剪切掉的部分，而不是默认的保留部分
+        clipper.Update()
+        # 获取剪切后的数据
+        # clipped_polydata = clipper.GetOutput().SetSpacing(self.spacing)
+        
         # 高斯平滑
         gauss_2 = vtkImageGaussianSmooth()
         gauss_2.SetInputData(jpgmodel_2)
@@ -134,13 +189,6 @@ class Reconstruction:
         gauss_2.SetRadiusFactors(1, 1, 1)  # 半径
         gauss_2.Update()
         gauss_2.GetOutput().SetSpacing(self.spacing)
-        print('gauss_1 completed')
-
-        # 创建 vtkFlyingEdges3D 对象
-        flying_edges_1 = vtkFlyingEdges3D()
-        flying_edges_1.SetInputConnection(gauss_1.GetOutputPort())
-        flying_edges_1.SetValue(0, 128)  # 设置边缘提取的阈值
-        flying_edges_1.Update()
 
         # 创建 vtkFlyingEdges3D 对象
         flying_edges_2 = vtkFlyingEdges3D()
@@ -148,7 +196,7 @@ class Reconstruction:
         flying_edges_2.SetValue(0, 128)  # 设置边缘提取的阈值
         flying_edges_2.Update()
         print('flying_edges completed')
-
+        
         # 平移
         transform = vtkTransform()
         z_translation = 315*self.spacing[2]  # 在 Z 方向上平移的距离
@@ -164,6 +212,7 @@ class Reconstruction:
         append_filter.AddInputData(flying_edges_1.GetOutput())
         append_filter.AddInputData(transform_filter.GetOutput())
         append_filter.Update()
+        '''
 
         # 平滑
         smoothFilter = vtkWindowedSincPolyDataFilter()
