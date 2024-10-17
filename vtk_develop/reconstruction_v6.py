@@ -20,7 +20,10 @@ from vtk import (
     vtkFlyingEdges3D,
     vtkSTLWriter,
     vtkPolyDataWriter,
-    vtkUnsignedCharArray
+    vtkUnsignedCharArray,
+    vtkAppendPolyData,
+    vtkTransform,
+    vtkTransformPolyDataFilter,
 )
 from vtkmodules.vtkCommonColor import vtkNamedColors  # 颜色
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
@@ -31,7 +34,6 @@ from vtkmodules.vtkRenderingCore import (
     vtkRenderWindow,
     vtkRenderWindowInteractor
 )
-
 
 class Reconstruction:
     def __init__(self, jpg_folder: str, width: int, height: int, spacing=[4, 4, 7]):
@@ -65,15 +67,15 @@ class Reconstruction:
         return vtk_reader.GetOutput()  # 获取 PolyData 对象
 
     # 读取JPG序列
-    def jpgReader(self):
+    def jpgReader(self,start,end):
         jpg_files = [file for file in os.listdir(self.jpg_folder) if file.lower().endswith('.jpg')]
         jpg_count = len(jpg_files)
         jpg_reader = vtkJPEGReader()
         jpg_reader.SetNumberOfScalarComponents(1)
         jpg_reader.SetFileDimensionality(2)
         jpg_reader.SetFilePattern(os.path.join(self.jpg_folder, "%06d.jpg"))
-        jpg_reader.SetFileNameSliceOffset(316)
-        jpg_reader.SetDataExtent(316, self.width - 1, 0, self.height - 1, 0, jpg_count - 1)
+        jpg_reader.SetFileNameSliceOffset(start)
+        jpg_reader.SetDataExtent(0, self.width - 1, 0, self.height - 1, 0, end-start)
         jpg_reader.Update()
         jpg_reader.GetOutput().SetSpacing(self.spacing)
         print('JPG reading completed')
@@ -113,27 +115,59 @@ class Reconstruction:
         start_3d = time.time()
 
         # 读取jpg序列
-        jpgmodel = self.jpgReader()
+        jpgmodel_1 = self.jpgReader(0,315)
+        jpgmodel_2 = self.jpgReader(316, 500)
+
 
         # 高斯平滑
-        gauss = vtkImageGaussianSmooth()
-        gauss.SetInputData(jpgmodel)
-        gauss.SetStandardDeviations(1, 1, 1)  # 标准差
-        gauss.SetRadiusFactors(1, 1, 1)  # 半径
-        gauss.Update()
-        gauss.GetOutput().SetSpacing(self.spacing)
-        print('gauss completed')
+        gauss_1 = vtkImageGaussianSmooth()
+        gauss_1.SetInputData(jpgmodel_1)
+        gauss_1.SetStandardDeviations(1, 1, 1)  # 标准差
+        gauss_1.SetRadiusFactors(1, 1, 1)  # 半径
+        gauss_1.Update()
+        gauss_1.GetOutput().SetSpacing(self.spacing)    # 设置空间间隔
+
+        # 高斯平滑
+        gauss_2 = vtkImageGaussianSmooth()
+        gauss_2.SetInputData(jpgmodel_2)
+        gauss_2.SetStandardDeviations(1, 1, 1)  # 标准差
+        gauss_2.SetRadiusFactors(1, 1, 1)  # 半径
+        gauss_2.Update()
+        gauss_2.GetOutput().SetSpacing(self.spacing)
+        print('gauss_1 completed')
 
         # 创建 vtkFlyingEdges3D 对象
-        flying_edges = vtkFlyingEdges3D()
-        flying_edges.SetInputConnection(gauss.GetOutputPort())
-        flying_edges.SetValue(0, 128)  # 设置边缘提取的阈值
-        flying_edges.Update()
+        flying_edges_1 = vtkFlyingEdges3D()
+        flying_edges_1.SetInputConnection(gauss_1.GetOutputPort())
+        flying_edges_1.SetValue(0, 128)  # 设置边缘提取的阈值
+        flying_edges_1.Update()
+
+        # 创建 vtkFlyingEdges3D 对象
+        flying_edges_2 = vtkFlyingEdges3D()
+        flying_edges_2.SetInputConnection(gauss_2.GetOutputPort())
+        flying_edges_2.SetValue(0, 128)  # 设置边缘提取的阈值
+        flying_edges_2.Update()
         print('flying_edges completed')
+
+        # 平移
+        transform = vtkTransform()
+        z_translation = 315*self.spacing[2]  # 在 Z 方向上平移的距离
+        transform.Translate(0, 0, z_translation)
+
+        transform_filter = vtkTransformPolyDataFilter()
+        transform_filter.SetInputData(flying_edges_2.GetOutput())
+        transform_filter.SetTransform(transform)
+        transform_filter.Update()
+
+        # 拼接
+        append_filter = vtkAppendPolyData()
+        append_filter.AddInputData(flying_edges_1.GetOutput())
+        append_filter.AddInputData(transform_filter.GetOutput())
+        append_filter.Update()
 
         # 平滑
         smoothFilter = vtkWindowedSincPolyDataFilter()
-        smoothFilter.SetInputConnection(flying_edges.GetOutputPort())
+        smoothFilter.SetInputConnection(append_filter.GetOutputPort())
         smoothFilter.SetNumberOfIterations(150)
         smoothFilter.SetPassBand(0.1)
         smoothFilter.BoundarySmoothingOn()
