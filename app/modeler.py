@@ -127,6 +127,7 @@ class Modeling:
                 flying_edges.Update()
                 print('flying_edges completed')
 
+
                 # 平滑
                 smoothFilter = vtkWindowedSincPolyDataFilter()
                 smoothFilter.SetInputConnection(flying_edges.GetOutputPort())
@@ -138,6 +139,8 @@ class Modeling:
                 smoothFilter.NormalizeCoordinatesOn()
                 smoothFilter.Update()
                 print('smoothFilter completed')
+
+
                 # 保存模型
                 self.vtk_polydata = smoothFilter.GetOutput()
                 self.save_model_as_vtk(self.vtk_polydata,self.project_folder,self.vtkname)
