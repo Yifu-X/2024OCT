@@ -31,5 +31,5 @@ def extract_contours_with_width(input_folder, output_folder, line_thickness=5):
 
 # 使用示例
 input_folder = r'C:\Users\19398\Desktop\123456_interpolation'  # 输入文件夹路径
-output_folder = r'C:\Users\19398\Desktop\temp'  # 输出文件夹路径
-extract_contours_with_width(input_folder, output_folder, line_thickness=5)  # 可调整线宽
+output_folder = r'C:\Users\19398\Desktop\temp_2'  # 输出文件夹路径
+extract_contours_with_width(input_folder, output_folder, line_thickness=2)  # 可调整线宽

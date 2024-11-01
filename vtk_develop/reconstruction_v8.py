@@ -1,4 +1,5 @@
 '''
+v8:尝试生成点云,生成实体，成功！
 v7：使用不同的三维方法，从点云生成实体
 v6:尝试分支开孔
 reconstruction更新到此结束，后续转为model_v1，分离了建模与渲染过程，更适配GUI操作
@@ -12,6 +13,7 @@ v1：png
 '''
 import os
 import time
+from tqdm import tqdm # 终端进度条
 
 from vtk import (
     vtkJPEGReader,
@@ -37,6 +39,15 @@ from vtk import (
     vtkLinearExtrusionFilter,
     vtkProperty,
     vtkMarchingCubes,
+    vtkPoints,
+    vtkPolyData,
+vtkGlyph3D,
+vtkSphereSource,
+vtkCubeSource,
+vtkSurfaceReconstructionFilter,
+vtkDelaunay3D,
+
+
 )
 from vtkmodules.vtkCommonColor import vtkNamedColors  # 颜色
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
@@ -45,7 +56,7 @@ from vtkmodules.vtkRenderingCore import (
     vtkActor,
     vtkRenderer,
     vtkRenderWindow,
-    vtkRenderWindowInteractor
+    vtkRenderWindowInteractor,
 )
 
 class Reconstruction:
@@ -94,6 +105,81 @@ class Reconstruction:
         print('JPG reading completed')
         return jpg_reader.GetOutput()
 
+    # 由图片序列生成点云
+    def create_point_cloud_from_images(self):
+        points = vtkPoints()
+        jpg_files = [file for file in os.listdir(self.jpg_folder) if file.lower().endswith('.jpg')]
+        # 读取图像序列
+        i = 0
+        for jpg_file in tqdm(jpg_files):  # num_images 是你的图像序列数量
+            file_path = os.path.join(self.jpg_folder, jpg_file)  # 根据你的文件命名方式调整
+            # 读取一张图片
+            reader = vtkJPEGReader()
+            reader.SetFileName(file_path)
+            reader.Update()
+
+            # 二值化处理(还是非常必要的)
+            threshold = vtkImageThreshold()
+            threshold.SetInputData(reader.GetOutput())
+            threshold.ThresholdByUpper(128)  # 提取白色区域（值为255）
+            threshold.SetInValue(255)  # 白色区域保留
+            threshold.SetOutValue(0)  # 其他区域设为0
+            threshold.Update()
+
+            # 提取白色像素
+            white_pixels = threshold.GetOutput()
+            dims = white_pixels.GetDimensions()
+            scalars = white_pixels.GetPointData().GetScalars()  # 获取标量数据
+
+            z_thickness = 7/4  # 设置厚度
+            for y in range(dims[1]):  # 遍历每一行
+                for x in range(dims[0]):  # 遍历每一列
+                    pixel_value = scalars.GetComponent(x + y * dims[0], 0)  # 获取对应的像素值
+                    if pixel_value == 255:  # 如果是白色
+                        points.InsertNextPoint(x, y, i*z_thickness)  # 在 z=0 的平面上插入点
+            i += 1
+            # print(f"{jpg_file}读取完毕！")
+
+        # 创建点云
+        polydata = vtkPolyData()
+        polydata.SetPoints(points)
+        print("坐标点生成完毕！")
+
+        # 创建 Delaunay 3D 对象
+        delaunay = vtkDelaunay3D()
+        delaunay.SetInputData(polydata)
+        delaunay.SetAlpha(7)  # 可以调整这个值
+        delaunay.SetTolerance(10)  # 设置适当的公差值
+        delaunay.Update()
+        print(type(delaunay.GetOutput()))
+
+        geometry_filter = vtkGeometryFilter()
+        geometry_filter.SetInputData(delaunay.GetOutput())  # 输入 vtkUnstructuredGrid
+        geometry_filter.Update()  # 执行过滤
+
+        '''                
+        # 创建小球作为点的几何体
+        sphere_source = vtkSphereSource()
+        sphere_source.SetRadius(0.5)  # 小球的半径
+        sphere_source.SetPhiResolution(10)  # 经度分辨率
+        sphere_source.SetThetaResolution(10)  # 纬度分辨率
+        sphere_source.Update()
+        
+        # 创建立方体源
+        cube_source = vtkCubeSource()
+        cube_source.SetXLength(1)  # 设置立方体的宽度
+        cube_source.SetYLength(1)  # 设置立方体的高度
+        cube_source.SetZLength(7 / 4)  # 设置立方体的厚度（与之前的小球厚度一致）
+
+        # 使用Glyph3D将每个点转换为小球
+        glyph = vtkGlyph3D()
+        glyph.SetSourceConnection(cube_source.GetOutputPort())
+        glyph.SetInputData(polydata)
+        # glyph.SetScaleModeToDataScalingOff()  # 使用点的标量值缩放（可选）
+        glyph.Update()
+        '''
+        return geometry_filter.GetOutput()
+
     # 没有就建立文件夹
     def folder_preparation(self, folder_path):
         if not os.path.exists(folder_path):
@@ -127,41 +213,17 @@ class Reconstruction:
     def process(self):
         start_3d = time.time()
 
-        # 读取jpg序列
-        jpgmodel = self.jpgReader(0, 1076)
-        
-        # 高斯平滑
-        gauss = vtkImageGaussianSmooth()
-        gauss.SetInputData(jpgmodel)
-        gauss.SetStandardDeviations(2, 2, 2)  # 标准差
-        gauss.SetRadiusFactors(2, 2, 2)  # 半径
-        gauss.Update()
-        gauss.GetOutput().SetSpacing(self.spacing)
+        PointCloud = self.create_point_cloud_from_images()
 
-        print('gauss completed')
-        # 创建 vtkFlyingEdges3D 对象
-        flying_edges = vtkFlyingEdges3D()
-        flying_edges.SetInputConnection(gauss.GetOutputPort())
-        flying_edges.SetValue(0, 128)  # 设置边缘提取的阈值
-        flying_edges.Update()
-
-
-        # 平滑
+        # 对 Delaunay 结果进行平滑处理
         smoothFilter = vtkWindowedSincPolyDataFilter()
-        smoothFilter.SetInputConnection(flying_edges.GetOutputPort())
-        smoothFilter.SetNumberOfIterations(150)
+        smoothFilter.SetInputData(PointCloud)
+        smoothFilter.SetNumberOfIterations(50)
         smoothFilter.SetPassBand(0.1)
-        smoothFilter.BoundarySmoothingOn()
-        smoothFilter.FeatureEdgeSmoothingOff()
-        smoothFilter.NonManifoldSmoothingOn()
-        smoothFilter.NormalizeCoordinatesOn()
         smoothFilter.Update()
 
-        # 保存生成的 vtkPolyData
-        self.vtk_polydata = smoothFilter.GetOutput()
-
         mapper = vtkPolyDataMapper()
-        mapper.SetInputConnection(smoothFilter.GetOutputPort())
+        mapper.SetInputData(smoothFilter.GetOutput())
         mapper.ScalarVisibilityOff()
 
         property_vessel = vtkProperty()
@@ -170,7 +232,8 @@ class Reconstruction:
         actor = vtkActor()
         actor.SetMapper(mapper)
         actor.SetProperty(property_vessel)
-        actor.RotateY(-90)
+        actor.GetProperty().SetRepresentationToSurface()  # 只显示表面
+        # actor.RotateY(-90)
         print("演员创建完成")
 
         # 创建渲染器
@@ -206,7 +269,7 @@ class Reconstruction:
 
 # 开始显示
 if __name__ == '__main__':
-    model_reconstruction = Reconstruction(r"C:\Users\19398\Desktop\temp_cut", 512, 512)
+    model_reconstruction = Reconstruction(r"C:\Users\19398\Desktop\cloud_test", 512, 512)
     model_reconstruction.process()
 
     # model_reconstruction.save_model_as_vtk("3dmodel", "3dvtk")
