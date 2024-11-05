@@ -6,6 +6,8 @@
       <excludeFolder url="file://$MODULE_DIR$/20241011" />
       <excludeFolder url="file://$MODULE_DIR$/vtk_develop/123456" />
       <excludeFolder url="file://$MODULE_DIR$/branch/data/FashionMNIST" />
+      <excludeFolder url="file://$MODULE_DIR$/DATA" />
+      <excludeFolder url="file://$MODULE_DIR$/branch/data" />
     </content>
     <orderEntry type="jdk" jdkName="OCT" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

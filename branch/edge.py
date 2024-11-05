@@ -1,3 +1,8 @@
+'''
+
+边缘提取，Canny方法，输出是一个宽度可调的二值图像
+
+'''
 import cv2
 import os
 import numpy as np
@@ -30,6 +35,7 @@ def extract_contours_with_width(input_folder, output_folder, line_thickness=5):
             cv2.imwrite(output_path, contour_image)
 
 # 使用示例
-input_folder = r'C:\Users\19398\Desktop\123456_interpolation'  # 输入文件夹路径
-output_folder = r'C:\Users\19398\Desktop\temp_2'  # 输出文件夹路径
-extract_contours_with_width(input_folder, output_folder, line_thickness=2)  # 可调整线宽
+line_thinckness = 3 # 可调整线宽
+input_folder = r'data\123456_interpolation'  # 输入文件夹路径
+output_folder = rf'data\edge_{line_thinckness}'  # 输出文件夹路径
+extract_contours_with_width(input_folder, output_folder, line_thinckness)
