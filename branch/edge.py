@@ -6,13 +6,14 @@
 import cv2
 import os
 import numpy as np
+from tqdm import tqdm # 终端进度条
 
 def extract_contours_with_width(input_folder, output_folder, line_thickness=5):
     # 创建输出文件夹
     os.makedirs(output_folder, exist_ok=True)
 
-    # 获取所有图像文件
-    for filename in os.listdir(input_folder):
+    # 批量处理所有图像文件
+    for filename in tqdm(os.listdir(input_folder)):
         if filename.endswith(('.png', '.jpg', '.jpeg', '.bmp')):  # 可根据需要添加文件格式
             # 读取图像
             img_path = os.path.join(input_folder, filename)
