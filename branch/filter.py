@@ -13,7 +13,7 @@ def filter(input_folder, output_folder, method:str, core):
     os.makedirs(output_folder, exist_ok=True)
 
     # 批量处理所有图像文件
-    for filename in tqdm(os.listdir(input_folder)):
+    for filename in tqdm(os.listdir(input_folder), desc="Processing", bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}", colour="green"):
         if filename.endswith(('.jpg')):  # 可根据需要添加文件格式
 
             # 读取二值轮廓线
@@ -32,8 +32,8 @@ def filter(input_folder, output_folder, method:str, core):
             cv2.imwrite(output_path, smoothed_image)
 
 # 使用示例
-method = "mean" # 可选滤波方法:mean,gauss
-core = (2,2) # 卷积核大小
+method = "gauss" # 可选滤波方法:mean,gauss
+core = (3,3) # 卷积核大小
 input_folder = r'data\edge_1'  # 输入文件夹路径
-output_folder = rf'data\edge_filter_{method}'  # 输出文件夹路径
+output_folder = rf'data\edge_1+edge_filter_{method}'  # 输出文件夹路径
 filter(input_folder, output_folder, method, core)
