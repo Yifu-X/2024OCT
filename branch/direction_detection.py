@@ -11,9 +11,60 @@ if sys.version_info[0] < 3:
 
 # 设置Windows控制台的输出编码为utf-8
 os.system('chcp 65001')
+# 计算血管中心
+def center_distance (image):
+    # 计算距离变换：计算所有白点到黑点的距离（我用的是插值后的原图，白色直接代表内部）
+    distance_transform = cv2.distanceTransform(image, cv2.DIST_L2, 5)
+    normalized_distance = cv2.normalize(distance_transform, None, 0, 255, cv2.NORM_MINMAX)  # 将距离变换的结果归一化到 [0, 255] 范围
+    normalized_distance = np.uint8(normalized_distance)  # 转换为 uint8 类型以便于显示
+    flat_indices = np.argsort(normalized_distance, axis=None)[::-1][:20]  # 获取前20个最大值的扁平化索引
+    max_coords = np.unravel_index(flat_indices, normalized_distance.shape)  # 将扁平化的索引转换为二维坐标
+    x_coords = max_coords[1]  # 获取x坐标
+    y_coords = max_coords[0]  # 获取y坐标
+    # 计算前20个最大值的平均坐标
+    avg_x = int(np.mean(x_coords))
+    avg_y = int(np.mean(y_coords))
+    return (avg_x,avg_y)
+
+# 查找最远端
+def farthest_point (contours,center):
+    # 初始化最远点的距离和坐标
+    max_distance = 0
+    farthest_point = None
+    num = 0
+    max_num = None
+
+    # 遍历每个轮廓
+    for contour in contours:
+        for point in contour:  # 逆时针遍历
+            x, y = point[0]  # 获取轮廓点的坐标
+
+            # 计算当前点到图像中心的欧氏距离
+            distance = np.sqrt((x - center[0]) ** 2 + (y - center[1]) ** 2)
+
+            # 更新最远点
+            if distance > max_distance:
+                max_distance = distance
+                farthest_point = (x, y)
+                max_num = num
+            num += 1
+
+    # 如果找到了最远点，标记出来
+    if farthest_point is not None:
+        print(f"：最远点半径：{max_distance}")
+        print(f"最远点序号：{max_num}")
+        return farthest_point,max_distance,max_num
+
+# 计算血管重心
+def center_mass(image):
+    # 计算图像的重心
+    M = cv2.moments(image)  # 使用Hu矩
+    cx = int(M["m10"] / M["m00"])  # 计算X轴方向的质心
+    cy = int(M["m01"] / M["m00"])  # 计算Y轴方向的质心
+    return (cx,cy)
 
 # 读取图像并转换为灰度图
-image = cv2.imread('data/123456_interpolation/001019.jpg', cv2.IMREAD_GRAYSCALE)
+image = cv2.imread('data/123456_interpolation/001023.jpg', cv2.IMREAD_GRAYSCALE)
 # 使用Canny边缘检测
 background = np.zeros_like(image) # 创建空白图像以绘制轮廓
 edges = cv2.Canny(image, 100, 200)
@@ -26,58 +77,20 @@ image_with_center_2 = cv2.cvtColor(background, cv2.COLOR_GRAY2BGR)
 '''
 中心提取
 '''
-# 计算距离变换：计算所有白点到黑点的距离（我用的是插值后的原图，白色直接代表内部）
-distance_transform = cv2.distanceTransform(image, cv2.DIST_L2, 5)
-normalized_distance = cv2.normalize(distance_transform, None, 0, 255, cv2.NORM_MINMAX)  # 将距离变换的结果归一化到 [0, 255] 范围
-normalized_distance = np.uint8(normalized_distance) # 转换为 uint8 类型以便于显示
-flat_indices = np.argsort(normalized_distance, axis=None)[::-1][:20]  # 获取前20个最大值的扁平化索引
-max_coords = np.unravel_index(flat_indices, normalized_distance.shape)# 将扁平化的索引转换为二维坐标
-x_coords = max_coords[1]  # 获取x坐标
-y_coords = max_coords[0]  # 获取y坐标
-# 计算前20个最大值的平均坐标
-avg_x = int(np.mean(x_coords))
-avg_y = int(np.mean(y_coords))
-# 中心可视化
-cv2.circle(image_with_center, (avg_x, avg_y), 3, (0, 255, 0), -1)  # 绿色圆圈标记
+center_d = center_distance(image)   # 计算中心
+cv2.circle(image_with_center, center_d, 3, (0, 255, 0), -1)  # 绿色圆圈标记
 
-'''
-中心-最远边缘点
-'''
-# 初始化最远点的距离和坐标
-max_distance = 0
-farthest_point = (avg_x, avg_y)
-num = 0
-max_num = None
-
-# 遍历每个轮廓
-for contour in contours:
-    for point in contour:   # 逆时针遍历
-        x, y = point[0]  # 获取轮廓点的坐标
-
-        # 计算当前点到图像中心的欧氏距离
-        distance = np.sqrt((x - avg_x) ** 2 + (y - avg_y) ** 2)
-
-        # 更新最远点
-        if distance > max_distance:
-            max_distance = distance
-            farthest_point = (x, y)
-            max_num = num
-        num += 1
-
-# 如果找到了最远点，标记出来
-if farthest_point is not None:
-    cv2.circle(image_with_center, farthest_point, 3, (0, 255, 255), -1)  # 黄色圆圈标记
-    print(f"：最远点半径：{max_distance}")
-    print(f"最远点序号：{max_num}")
 '''
 重心提取
 '''
-# 计算图像的重心
-M = cv2.moments(image)  # 使用Hu矩
-cx = int(M["m10"] / M["m00"])  # 计算X轴方向的质心
-cy = int(M["m01"] / M["m00"])  # 计算Y轴方向的质心
-# 重心可视化
-cv2.circle(image_with_center, (cx, cy), 3, (255, 0, 0), -1)  # 在质心位置画一个红点
+center_m = center_mass(image)   # 计算图像的重心
+cv2.circle(image_with_center, center_m, 3, (255, 0, 0), -1)  # 在质心位置画一个蓝点
+
+'''
+最远边缘点
+'''
+farthest_point,max_distance,max_num = farthest_point(contours,center_d)
+cv2.circle(image_with_center, farthest_point, 3, (0, 255, 255), -1)  # 黄色圆圈标记
 
 '''
 
@@ -96,19 +109,23 @@ for contour in contours:
     for point in contour:
         x, y = point[0]
         # 以中心为极点建立极坐标系
-        dx = np.float32(x - avg_x)
-        dy = np.float32(y - avg_y)
+        dx = np.float32(x - center_d[0])
+        dy = np.float32(y - center_d[1])
         # 计算到中心的距离r 和 角度θ
         r, theta = cv2.cartToPolar(np.array([dx]), np.array([dy]))  # 转换到极坐标系
         # 将极坐标值添加到列表中
         points_with_polar.append((r[0], theta[0], point))
+        r_values.append(r)
+        theta_values.append(theta)
 
+    '''
     # 按照极角（theta）对点进行排序，确保从极角最小的点开始
     sorted_points = sorted(points_with_polar, key=lambda p: p[1])  # p[1] 是 θ
     # 将排序后的点添加到 r_values 和 theta_values
     for r, theta, point in sorted_points:
         r_values.append(r)
         theta_values.append(theta)
+    '''
 
     r_prime_last = 0
     # 计算曲率，使用数值差分估算r'(θ) 和 r''(θ)
@@ -173,9 +190,9 @@ axs[2].legend()
 plt.tight_layout()
 
 # 显示图形
-#plt.show()
+plt.show()
 
-# cv2.imshow('Image with 2 Centers', image_with_center)
+cv2.imshow('Image with 2 Centers', image_with_center)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
 

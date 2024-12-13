@@ -37,16 +37,6 @@ class Modeling:
         self.vtk_polydata = None  # 存储处理后的vtkPolyData对象
         self.model_probe = None # 储存探针模型
 
-    # 自定义颜色
-    def setup_colors(self):
-        color_vessel = list(map(lambda x: x / 255.0, [204, 0, 0, 255]))
-        self.colors.SetColor("Vessel", *color_vessel)  # 血管红色
-        color_branch = list(map(lambda x: x / 255.0, [8, 79, 184, 255]))
-        self.colors.SetColor("Branch", *color_branch)  # 分支蓝色
-        color_probe = list(map(lambda x: x / 255.0, [192, 192, 192, 255]))
-        self.colors.SetColor("Probe", *color_probe)  # 探针银色
-        self.colors.SetColor("Background", self.colors.GetColor3d('CornflowerBlue'))  # 背景蓝色
-
     # 读取已有模型
     def vtkReader(self, vtkfilepath: str, vtkfilename: str):
         vtk_reader = vtkPolyDataReader()
@@ -198,24 +188,26 @@ class Rendering:
         print("指针渲染成功")
 
         # ————————————————血管渲染————————————————————
-        # 分段设置颜色
-        points = self.polydata_vessel.GetPoints()
-        for i in range(points.GetNumberOfPoints()):
-            x, y, z = points.GetPoint(i)
-            if 1582 <= z <= 1694 or 2177 <= z <= 2345 or 5208 <= z <= 5348 or 7021 <= z <= 7252:
-                self.colors_array.InsertNextTuple3(*[int(c * 255) for c in self.colors.GetColor3d("Branch")])
-            else:
-                self.colors_array.InsertNextTuple3(*[int(c * 255) for c in self.colors.GetColor3d("Vessel")])
-        self.polydata_vessel.GetPointData().SetScalars(self.colors_array)
-        print("分支颜色设置完成")
-
+        # # 分段设置颜色
+        # points = self.polydata_vessel.GetPoints()
+        # for i in range(points.GetNumberOfPoints()):
+        #     x, y, z = points.GetPoint(i)
+        #     if 1582 <= z <= 1694 or 2177 <= z <= 2345 or 5208 <= z <= 5348 or 7021 <= z <= 7252:
+        #         self.colors_array.InsertNextTuple3(*[int(c * 255) for c in self.colors.GetColor3d("Branch")])
+        #     else:
+        #         self.colors_array.InsertNextTuple3(*[int(c * 255) for c in self.colors.GetColor3d("Vessel")])
+        # self.polydata_vessel.GetPointData().SetScalars(self.colors_array)
+        # print("分支颜色设置完成")
+        property_vessel = vtkProperty()
+        property_vessel.SetColor(self.colors.GetColor3d("Vessel"))
         mapper_vessel = vtkPolyDataMapper()
         mapper_vessel.SetInputData(self.polydata_vessel)
-        mapper_vessel.ScalarVisibilityOn()
+        mapper_vessel.ScalarVisibilityOff()
         print("映射器创建完成")
 
         self.actor_vessel = vtkActor()
         self.actor_vessel.SetMapper(mapper_vessel)
+        self.actor_vessel.SetProperty(property_vessel)
         self.actor_vessel.SetPosition([-512*4/2,-512*4/2,0])
         print("演员创建完成")
 
